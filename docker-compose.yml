@@ -1,0 +1,92 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: cow_postgres
+    environment:
+      POSTGRES_DB: call_of_war
+      POSTGRES_USER: cowuser
+      POSTGRES_PASSWORD: cowpass123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cowuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cow_network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: cow_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cow_network
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cow_backend
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://cowuser:cowpass123@postgres:5432/call_of_war
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-key-change-in-production
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/logs:/app/logs
+    networks:
+      - cow_network
+    restart: unless-stopped
+
+  # Frontend Web Client
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: cow_frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:3000
+      REACT_APP_WS_URL: ws://localhost:3000
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/src:/app/src
+    networks:
+      - cow_network
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  cow_network:
+    driver: bridge
