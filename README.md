@@ -103,11 +103,11 @@ docker-compose up
 - Safari 14+
 - Edge 90+
 
-## 📜 License
+## 📄 License
 
 MIT License - See LICENSE file
 
-## 👥 Contributing
+## 🤝 Contributing
 
 See CONTRIBUTING.md for guidelines
 
